@@ -1,4 +1,4 @@
-import argparse
+import argparse, yaml
 import sys
 import os
 
@@ -13,6 +13,8 @@ from tqdm import tqdm
 from vqvae import VQVAE
 from scheduler import CycleScheduler
 import distributed as dist
+
+import datetime
 
 
 def train(epoch, loader, model, optimizer, scheduler, device):
@@ -85,11 +87,17 @@ def main(args):
     device = "cuda"
 
     args.distributed = dist.get_world_size() > 1
+    
+    with open(os.path.join("configs", args.config)) as f:
+        config = yaml.safe_load(f)
+
+    size = config['input_size']
+    bs = config['batch_size']
 
     transform = transforms.Compose(
         [
-            transforms.Resize(args.size),
-            transforms.CenterCrop(args.size),
+            transforms.Resize(size),
+            transforms.CenterCrop(size),
             transforms.ToTensor(),
             transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
         ]
@@ -98,10 +106,10 @@ def main(args):
     dataset = datasets.ImageFolder(args.path, transform=transform)
     sampler = dist.data_sampler(dataset, shuffle=True, distributed=args.distributed)
     loader = DataLoader(
-        dataset, batch_size=128 // args.n_gpu, sampler=sampler, num_workers=2
+        dataset, batch_size=bs // args.n_gpu, sampler=sampler, num_workers=2
     )
 
-    model = VQVAE().to(device)
+    model = VQVAE(config).to(device)
 
     if args.distributed:
         model = nn.parallel.DistributedDataParallel(
@@ -124,8 +132,9 @@ def main(args):
     for i in range(args.epoch):
         train(i, loader, model, optimizer, scheduler, device)
 
-        if dist.is_primary():
-            torch.save(model.state_dict(), f"checkpoint/vqvae_{str(i + 1).zfill(3)}.pt")
+        if dist.is_primary() and (i+1) % 10 == 0:
+            dt = datetime.datetime.now().strftime("%Y%m%d_%H%M%s%f")
+            torch.save(model.state_dict(), f"checkpoint/vqvae/{dt}vqvae_{str(i + 1).zfill(3)}.pt")
 
 
 if __name__ == "__main__":
@@ -139,10 +148,11 @@ if __name__ == "__main__":
     )
     parser.add_argument("--dist_url", default=f"tcp://127.0.0.1:{port}")
 
-    parser.add_argument("--size", type=int, default=256)
+    # parser.add_argument("--size", type=int, default=256)
     parser.add_argument("--epoch", type=int, default=560)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--sched", type=str)
+    parser.add_argument("--config", default=list())
     parser.add_argument("path", type=str)
 
     args = parser.parse_args()

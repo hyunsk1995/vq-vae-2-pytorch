@@ -164,15 +164,27 @@ class Decoder(nn.Module):
 class VQVAE(nn.Module):
     def __init__(
         self,
+        config,
         in_channel=3,
-        channel=128,
-        n_res_block=2,
-        n_res_channel=32,
-        embed_dim=64,
-        n_embed=512,
+        # channel=128,
+        # n_res_block=2,
+        # n_res_channel=32,
+        # embed_dim=64,
+        # n_embed=512,
         decay=0.99,
     ):
         super().__init__()
+
+        embed_dim = config["codebook_dim"]
+        n_embed = config["codebook_size"]
+        num_latent_layers = config["num_latent_layers"]
+        n_res_block = config["layers"]
+        n_res_channel = config["residual_units"]
+        channel = config["hidden_units"]
+
+        if num_latent_layers == 2:
+            """
+            """
 
         self.enc_b = Encoder(in_channel, channel, n_res_block, n_res_channel, stride=4)
         self.enc_t = Encoder(channel, channel, n_res_block, n_res_channel, stride=2)
