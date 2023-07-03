@@ -147,9 +147,12 @@ if __name__ == '__main__':
             optimizer, args.lr, n_iter=len(loader) * args.epoch, momentum=None
         )
 
+    save_checkpoints = 10
+
     for i in range(args.epoch):
         train(args, i, loader, model, optimizer, scheduler, device)
-        torch.save(
-            {'model': model.module.state_dict(), 'args': args},
-            f'checkpoint/pixelsnail_{args.hier}_{str(i + 1).zfill(3)}.pt',
-        )
+        if (i+1) % save_checkpoints == 0:
+            torch.save(
+                {'model': model.module.state_dict(), 'args': args},
+                f'checkpoint/pixelsnail_{args.hier}_{str(i + 1).zfill(3)}.pt',
+            )
